@@ -1,0 +1,59 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Deckd — Gesture-Controlled Presentations</title>
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+  <!-- Landing Page -->
+  <div id="landing" class="screen active">
+    <div class="landing-container">
+      <h1 class="logo">Deckd</h1>
+      <p class="tagline">Control presentations with your hands</p>
+
+      <div id="drop-zone" class="drop-zone">
+        <div class="drop-zone-content">
+          <span class="drop-icon">📄</span>
+          <p class="drop-text">Drop your PDF here</p>
+          <p class="drop-subtext">or click to browse</p>
+        </div>
+        <input type="file" id="file-input" accept=".pdf" hidden>
+      </div>
+
+      <div class="features">
+        <span class="feature">✋ Gesture control</span>
+        <span class="feature-dot">·</span>
+        <span class="feature">🔒 100% local</span>
+        <span class="feature-dot">·</span>
+        <span class="feature">⚡ No install</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- Presenter View -->
+  <div id="presenter" class="screen">
+    <div id="slide-container" class="slide-container">
+      <canvas id="slide-canvas"></canvas>
+      <div id="laser-pointer" class="laser-pointer" hidden></div>
+    </div>
+
+    <div id="webcam-strip" class="webcam-strip">
+      <div class="webcam-wrapper">
+        <video id="webcam-video" autoplay playsinline muted></video>
+        <canvas id="skeleton-canvas"></canvas>
+      </div>
+      <div id="gesture-badge" class="gesture-badge">
+        <span id="gesture-icon">🤚</span>
+        <span id="gesture-text">Waiting...</span>
+      </div>
+      <div id="slide-counter" class="slide-counter">
+        <span id="current-slide">0</span> / <span id="total-slides">0</span>
+      </div>
+    </div>
+  </div>
+
+  <script type="module" src="js/app.js"></script>
+</body>
+</html>

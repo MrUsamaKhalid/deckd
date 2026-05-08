@@ -1,0 +1,212 @@
+/* === Reset & Base === */
+*, *::before, *::after {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+html, body {
+  height: 100%;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  background: #fafafa;
+  color: #111;
+  overflow: hidden;
+}
+
+/* === Screen Routing === */
+.screen {
+  display: none;
+  width: 100%;
+  height: 100%;
+}
+
+.screen.active {
+  display: flex;
+}
+
+/* === Landing Page === */
+#landing {
+  align-items: center;
+  justify-content: center;
+  background: #fafafa;
+}
+
+.landing-container {
+  text-align: center;
+  max-width: 520px;
+  padding: 40px 20px;
+}
+
+.logo {
+  font-size: 48px;
+  font-weight: 700;
+  letter-spacing: -2px;
+  color: #111;
+}
+
+.tagline {
+  color: #888;
+  font-size: 16px;
+  margin-top: 6px;
+}
+
+.drop-zone {
+  margin: 36px auto;
+  width: 100%;
+  height: 200px;
+  border: 2px dashed #d0d0d0;
+  border-radius: 16px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: border-color 0.2s, background 0.2s;
+  background: #fff;
+}
+
+.drop-zone:hover,
+.drop-zone.drag-over {
+  border-color: #111;
+  background: #f5f5f5;
+}
+
+.drop-zone-content {
+  text-align: center;
+}
+
+.drop-icon {
+  font-size: 40px;
+  display: block;
+  margin-bottom: 12px;
+}
+
+.drop-text {
+  font-size: 16px;
+  font-weight: 500;
+  color: #333;
+}
+
+.drop-subtext {
+  font-size: 13px;
+  color: #aaa;
+  margin-top: 4px;
+}
+
+.features {
+  display: flex;
+  gap: 12px;
+  justify-content: center;
+  align-items: center;
+  font-size: 13px;
+  color: #999;
+}
+
+.feature-dot {
+  color: #ccc;
+}
+
+/* === Presenter View === */
+#presenter {
+  flex-direction: column;
+  background: #000;
+}
+
+.slide-container {
+  flex: 1;
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  background: #111;
+}
+
+#slide-canvas {
+  max-width: 100%;
+  max-height: 100%;
+  object-fit: contain;
+  transition: transform 0.15s ease-out;
+}
+
+.laser-pointer {
+  position: absolute;
+  width: 12px;
+  height: 12px;
+  background: #ff3b30;
+  border-radius: 50%;
+  box-shadow: 0 0 8px 3px rgba(255, 59, 48, 0.5);
+  pointer-events: none;
+  transform: translate(-50%, -50%);
+  z-index: 10;
+}
+
+/* === Webcam Strip === */
+.webcam-strip {
+  height: 80px;
+  background: #0a0a0a;
+  display: flex;
+  align-items: center;
+  border-top: 1px solid #222;
+  padding: 0 12px;
+  gap: 12px;
+}
+
+.webcam-wrapper {
+  position: relative;
+  height: 64px;
+  aspect-ratio: 4/3;
+  border-radius: 8px;
+  overflow: hidden;
+  flex-shrink: 0;
+}
+
+#webcam-video {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  transform: scaleX(-1);
+}
+
+#skeleton-canvas {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  transform: scaleX(-1);
+}
+
+.gesture-badge {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  background: rgba(255, 255, 255, 0.08);
+  padding: 6px 14px;
+  border-radius: 20px;
+  font-size: 13px;
+  color: #aaa;
+  white-space: nowrap;
+}
+
+#gesture-icon {
+  font-size: 16px;
+}
+
+.slide-counter {
+  margin-left: auto;
+  font-size: 14px;
+  color: #666;
+  font-variant-numeric: tabular-nums;
+  padding-right: 8px;
+  white-space: nowrap;
+}
+
+/* === Loading State === */
+.loading-text {
+  color: #666;
+  font-size: 14px;
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+}
