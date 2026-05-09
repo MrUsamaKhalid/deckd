@@ -8,27 +8,41 @@ let gestureCallback = null;
 let landmarkCallback = null;
 let running = false;
 
-// Swipe detection
-const SWIPE_THRESHOLD = 0.15;
-const MIN_VELOCITY = 0.0005;
-const SWIPE_TIME_WINDOW = 300;
+// --- Tuning constants ---
 
-// Hysteresis state machine
-const CONFIRM_FRAMES = 6;
+// Swipe detection (uses index fingertip for more signal)
+const SWIPE_THRESHOLD = 0.12;
+const MIN_VELOCITY = 0.0004;
+const SWIPE_TIME_WINDOW = 350;
+
+// Hysteresis — reduced from 6 to 3 for snappier response
+const CONFIRM_FRAMES = 3;
 let candidateGesture = null;
 let candidateFrames = 0;
 let confirmedGesture = 'none';
 
 // Per-type cooldowns
-const COOLDOWN_SWIPE = 600;
-const COOLDOWN_STATIC = 300;
+const COOLDOWN_SWIPE = 500;
+const COOLDOWN_STATIC = 200;
 let lastSwipeTime = 0;
 let lastStaticTime = 0;
 
-// Finger margin for confidence
-const FINGER_MARGIN = 0.04;
+// Finger margin — lowered because EMA smoothing handles jitter
+const FINGER_MARGIN = 0.015;
 
-let wristHistory = [];
+// EMA smoothing (alpha = 0.4 → 40% new data, 60% smoothed history)
+const SMOOTH_ALPHA = 0.4;
+let smoothedLandmarks = null;
+
+// Throttle detection to ~30fps for performance
+const DETECT_INTERVAL_MS = 33;
+let lastDetectTime = 0;
+
+// Swipe history (tracks index fingertip, not just wrist)
+let swipeHistory = [];
+
+// Handedness from MediaPipe
+let detectedHandedness = 'Right';
 
 async function initGesture(videoEl, onGesture, onLandmarks) {
   videoElement = videoEl;
@@ -48,7 +62,10 @@ async function initGesture(videoEl, onGesture, onLandmarks) {
       delegate: 'GPU'
     },
     runningMode: 'VIDEO',
-    numHands: 1
+    numHands: 1,
+    minHandDetectionConfidence: 0.6,
+    minHandPresenceConfidence: 0.6,
+    minTrackingConfidence: 0.6
   });
 }
 
@@ -61,11 +78,13 @@ async function startWebcam() {
     videoElement.onloadedmetadata = resolve;
   });
   running = true;
+  smoothedLandmarks = null;
   detectLoop();
 }
 
 function stopWebcam() {
   running = false;
+  smoothedLandmarks = null;
   if (webcamStream) {
     webcamStream.getTracks().forEach(t => t.stop());
     webcamStream = null;
@@ -76,13 +95,31 @@ function detectLoop() {
   if (!running || !handLandmarker) return;
 
   const now = performance.now();
+
+  // Throttle to ~30fps — reduces GPU pressure and lag
+  if (now - lastDetectTime < DETECT_INTERVAL_MS) {
+    requestAnimationFrame(detectLoop);
+    return;
+  }
+  lastDetectTime = now;
+
   const results = handLandmarker.detectForVideo(videoElement, now);
 
   if (results.landmarks && results.landmarks.length > 0) {
-    const landmarks = results.landmarks[0];
+    const rawLandmarks = results.landmarks[0];
+
+    // Get handedness from MediaPipe (much more accurate than computing)
+    if (results.handedness && results.handedness.length > 0) {
+      detectedHandedness = results.handedness[0][0].categoryName; // "Left" or "Right"
+    }
+
+    // Apply EMA smoothing to reduce jitter
+    const landmarks = smoothLandmarks(rawLandmarks);
+
     if (landmarkCallback) landmarkCallback(landmarks);
     processGestures(landmarks, now);
   } else {
+    smoothedLandmarks = null;
     if (landmarkCallback) landmarkCallback(null);
     updateStateMachine('none', null, now);
   }
@@ -90,28 +127,48 @@ function detectLoop() {
   requestAnimationFrame(detectLoop);
 }
 
+// Exponential moving average on all 21 landmarks
+function smoothLandmarks(raw) {
+  if (!smoothedLandmarks) {
+    smoothedLandmarks = raw.map(p => ({ x: p.x, y: p.y, z: p.z }));
+    return smoothedLandmarks;
+  }
+
+  smoothedLandmarks = raw.map((p, i) => ({
+    x: SMOOTH_ALPHA * p.x + (1 - SMOOTH_ALPHA) * smoothedLandmarks[i].x,
+    y: SMOOTH_ALPHA * p.y + (1 - SMOOTH_ALPHA) * smoothedLandmarks[i].y,
+    z: SMOOTH_ALPHA * p.z + (1 - SMOOTH_ALPHA) * smoothedLandmarks[i].z
+  }));
+
+  return smoothedLandmarks;
+}
+
 function processGestures(landmarks, now) {
-  const wrist = landmarks[0];
+  // Use index fingertip (landmark 8) for swipe — more movement than wrist
+  const indexTip = landmarks[8];
 
-  wristHistory.push({ x: wrist.x, time: now });
-  wristHistory = wristHistory.filter(p => now - p.time < SWIPE_TIME_WINDOW);
+  swipeHistory.push({ x: indexTip.x, time: now });
+  swipeHistory = swipeHistory.filter(p => now - p.time < SWIPE_TIME_WINDOW);
 
-  // Check swipes first (instant, no hysteresis)
-  if (now - lastSwipeTime >= COOLDOWN_SWIPE && wristHistory.length >= 2) {
-    const first = wristHistory[0];
-    const last = wristHistory[wristHistory.length - 1];
+  // Check swipes first (bypass hysteresis — swipes are instant)
+  if (now - lastSwipeTime >= COOLDOWN_SWIPE && swipeHistory.length >= 3) {
+    const first = swipeHistory[0];
+    const last = swipeHistory[swipeHistory.length - 1];
     const deltaX = last.x - first.x;
     const deltaTime = last.time - first.time;
 
     if (deltaTime > 0 && Math.abs(deltaX) > SWIPE_THRESHOLD) {
       const velocity = Math.abs(deltaX) / deltaTime;
       if (velocity > MIN_VELOCITY) {
-        // Webcam is mirrored — negate so user's right = swipe_right
-        const gesture = deltaX > 0 ? 'swipe_left' : 'swipe_right';
-        emitGesture(gesture, landmarks);
-        lastSwipeTime = now;
-        wristHistory = [];
-        return;
+        // Check direction consistency — at least 60% of movement should agree
+        if (isSwipeConsistent(deltaX > 0)) {
+          // Webcam is mirrored — negate so user's right = swipe_right
+          const gesture = deltaX > 0 ? 'swipe_left' : 'swipe_right';
+          emitGesture(gesture, landmarks);
+          lastSwipeTime = now;
+          swipeHistory = [];
+          return;
+        }
       }
     }
   }
@@ -119,6 +176,17 @@ function processGestures(landmarks, now) {
   // Static gestures go through hysteresis
   const raw = classifyStaticGesture(landmarks);
   updateStateMachine(raw, landmarks, now);
+}
+
+// Verify swipe direction is consistent (not jittery back-and-forth)
+function isSwipeConsistent(isPositive) {
+  if (swipeHistory.length < 3) return false;
+  let agree = 0;
+  for (let i = 1; i < swipeHistory.length; i++) {
+    const dx = swipeHistory[i].x - swipeHistory[i - 1].x;
+    if ((dx > 0) === isPositive) agree++;
+  }
+  return agree / (swipeHistory.length - 1) >= 0.55;
 }
 
 function updateStateMachine(raw, landmarks, now) {
@@ -139,7 +207,8 @@ function updateStateMachine(raw, landmarks, now) {
 }
 
 function classifyStaticGesture(landmarks) {
-  const isRight = isRightHand(landmarks);
+  // Use MediaPipe handedness (mirrored in webcam: MP says "Right" for user's right hand)
+  const isRight = detectedHandedness === 'Right';
   const fingers = getFingerStates(landmarks, isRight);
 
   // Peace sign: index + middle up, rest down
@@ -147,37 +216,39 @@ function classifyStaticGesture(landmarks) {
     return 'peace';
   }
 
-  // Thumbs up/down: only thumb extended
-  if (fingers.thumb && !fingers.index && !fingers.middle && !fingers.ring && !fingers.pinky) {
+  // Thumbs up/down: only thumb extended (allow ring/pinky ambiguity)
+  if (fingers.thumb && !fingers.index && !fingers.middle) {
     const thumbTip = landmarks[4];
-    const thumbBase = landmarks[2];
-    return thumbTip.y < thumbBase.y ? 'thumbs_up' : 'thumbs_down';
+    const wrist = landmarks[0];
+    // Use wrist as reference for vertical direction — more robust
+    if (thumbTip.y < wrist.y - 0.08) return 'thumbs_up';
+    if (thumbTip.y > wrist.y + 0.04) return 'thumbs_down';
   }
 
-  // Open palm: all extended
+  // Open palm: all 5 extended
   if (fingers.thumb && fingers.index && fingers.middle && fingers.ring && fingers.pinky) {
     return 'open_palm';
   }
 
-  // Fist: none extended
-  if (!fingers.thumb && !fingers.index && !fingers.middle && !fingers.ring && !fingers.pinky) {
+  // Fist: none extended (relaxed check — allow thumb ambiguity)
+  if (!fingers.index && !fingers.middle && !fingers.ring && !fingers.pinky) {
     return 'fist';
   }
 
   return 'none';
 }
 
-function isRightHand(landmarks) {
-  return landmarks[17].x < landmarks[5].x;
-}
-
 function getFingerStates(landmarks, isRight) {
+  // Thumb: compare tip (4) vs CMC base (1) in x-axis
+  // More robust than using IP joint — bigger distance, less noise
   const thumbTip = landmarks[4];
-  const thumbIP = landmarks[3];
+  const thumbCMC = landmarks[1];
   const thumb = isRight
-    ? (thumbTip.x < thumbIP.x - FINGER_MARGIN)
-    : (thumbTip.x > thumbIP.x + FINGER_MARGIN);
+    ? (thumbTip.x < thumbCMC.x - FINGER_MARGIN)
+    : (thumbTip.x > thumbCMC.x + FINGER_MARGIN);
 
+  // Fingers: tip vs PIP — the standard 2-joint check
+  // With EMA smoothing, this is reliable even with low margin
   const index = landmarks[8].y < landmarks[6].y - FINGER_MARGIN;
   const middle = landmarks[12].y < landmarks[10].y - FINGER_MARGIN;
   const ring = landmarks[16].y < landmarks[14].y - FINGER_MARGIN;

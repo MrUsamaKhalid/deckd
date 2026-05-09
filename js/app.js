@@ -1,5 +1,5 @@
 import { initPdfViewer, loadPdf, nextSlide, prevSlide, goToPage, zoomIn, zoomOut, resetZoom, renderPage, getState, getPdfDoc } from './pdf-viewer.js?v=3';
-import { initGesture, startWebcam, stopWebcam, getIndexFingerTip } from './gesture.js?v=3';
+import { initGesture, startWebcam, stopWebcam, getIndexFingerTip } from './gesture.js?v=4';
 import {
   initUI,
   drawHandSkeleton,
