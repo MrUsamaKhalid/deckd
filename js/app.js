@@ -16,28 +16,36 @@ let gestureHoldTimer = null;
 const ZOOM_REPEAT_MS = 400;
 
 async function init() {
-  const urlParams = new URLSearchParams(window.location.search);
-  const pdfUrl = urlParams.get('pdf');
+  try {
+    const urlParams = new URLSearchParams(window.location.search);
+    const pdfUrl = urlParams.get('pdf');
 
-  setupDragDrop(
-    document.getElementById('drop-zone'),
-    document.getElementById('file-input'),
-    onPdfLoaded
-  );
+    setupDragDrop(
+      document.getElementById('drop-zone'),
+      document.getElementById('file-input'),
+      onPdfLoaded
+    );
 
-  setupKeyboard();
+    setupKeyboard();
 
-  if (pdfUrl) {
-    await startPresenter();
-    await loadPdf(pdfUrl);
-    updateSlideCounter(1, getState().totalPages);
+    if (pdfUrl) {
+      await startPresenter();
+      await loadPdf(pdfUrl);
+      updateSlideCounter(1, getState().totalPages);
+    }
+  } catch (err) {
+    console.error('[Deckd] Init error:', err);
   }
 }
 
 async function onPdfLoaded(arrayBuffer) {
-  await startPresenter();
-  await loadPdf(arrayBuffer);
-  updateSlideCounter(1, getState().totalPages);
+  try {
+    await startPresenter();
+    await loadPdf(arrayBuffer);
+    updateSlideCounter(1, getState().totalPages);
+  } catch (err) {
+    console.error('[Deckd] PDF load error:', err);
+  }
 }
 
 async function startPresenter() {
@@ -51,17 +59,20 @@ async function startPresenter() {
   const skeletonCanvas = document.getElementById('skeleton-canvas');
   initUI(skeletonCanvas);
 
-  const video = document.getElementById('webcam-video');
-  await initGesture(video, onGesture, onLandmarks);
-  await startWebcam();
+  try {
+    const video = document.getElementById('webcam-video');
+    await initGesture(video, onGesture, onLandmarks);
+    await startWebcam();
+  } catch (err) {
+    console.warn('[Deckd] Gesture init failed, using keyboard controls only:', err);
+    updateGestureBadge('none');
+  }
 }
 
 function onGesture(gesture, landmarks) {
   if (gesture === currentGesture) return;
 
   clearGestureHold();
-
-  const prevGesture = currentGesture;
   currentGesture = gesture;
   updateGestureBadge(gesture);
 

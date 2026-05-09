@@ -1,5 +1,5 @@
-const PDF_CDN = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/4.9.155/pdf.min.mjs';
-const WORKER_CDN = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/4.9.155/pdf.worker.min.mjs';
+const PDF_CDN = 'https://cdn.jsdelivr.net/npm/pdfjs-dist@4.8.69/build/pdf.mjs';
+const WORKER_CDN = 'https://cdn.jsdelivr.net/npm/pdfjs-dist@4.8.69/build/pdf.worker.mjs';
 
 let pdfDoc = null;
 let currentPage = 1;
@@ -50,27 +50,45 @@ async function renderPage() {
   if (!pdfDoc || rendering) return;
   rendering = true;
 
-  const page = await pdfDoc.getPage(currentPage);
-  const container = canvas.parentElement;
-  const containerWidth = container.clientWidth;
-  const containerHeight = container.clientHeight;
+  try {
+    const page = await pdfDoc.getPage(currentPage);
+    const container = canvas.parentElement;
 
-  const unscaledViewport = page.getViewport({ scale: 1 });
-  const scale = Math.min(
-    containerWidth / unscaledViewport.width,
-    containerHeight / unscaledViewport.height
-  );
-  const viewport = page.getViewport({ scale: scale * window.devicePixelRatio });
+    // Wait a frame for layout to settle
+    await new Promise(r => requestAnimationFrame(r));
 
-  canvas.width = viewport.width;
-  canvas.height = viewport.height;
-  canvas.style.width = `${viewport.width / window.devicePixelRatio}px`;
-  canvas.style.height = `${viewport.height / window.devicePixelRatio}px`;
+    const containerWidth = container.clientWidth;
+    const containerHeight = container.clientHeight;
 
-  applyZoomTransform();
+    if (containerWidth === 0 || containerHeight === 0) {
+      console.warn('Container has zero dimensions, retrying...');
+      rendering = false;
+      setTimeout(() => renderPage(), 100);
+      return;
+    }
 
-  await page.render({ canvasContext: ctx, viewport }).promise;
-  rendering = false;
+    const unscaledViewport = page.getViewport({ scale: 1 });
+    const scale = Math.min(
+      containerWidth / unscaledViewport.width,
+      containerHeight / unscaledViewport.height
+    );
+    const dpr = window.devicePixelRatio || 1;
+    const viewport = page.getViewport({ scale: scale * dpr });
+
+    canvas.width = viewport.width;
+    canvas.height = viewport.height;
+    canvas.style.width = `${viewport.width / dpr}px`;
+    canvas.style.height = `${viewport.height / dpr}px`;
+
+    applyZoomTransform();
+
+    const renderTask = page.render({ canvasContext: ctx, viewport });
+    await renderTask.promise;
+  } catch (err) {
+    console.error('Render error:', err);
+  } finally {
+    rendering = false;
+  }
 }
 
 function applyZoomTransform() {
