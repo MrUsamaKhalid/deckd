@@ -1,4 +1,5 @@
-const MEDIAPIPE_CDN = 'https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.22';
+const MEDIAPIPE_CDN = 'https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.14';
+const MODEL_URL = 'https://storage.googleapis.com/mediapipe-models/hand_landmarker/hand_landmarker/float16/1/hand_landmarker.task';
 
 let handLandmarker = null;
 let webcamStream = null;
@@ -29,7 +30,7 @@ async function initGesture(videoEl, onGesture, onLandmarks) {
 
   handLandmarker = await HandLandmarker.createFromOptions(wasmFileset, {
     baseOptions: {
-      modelAssetPath: `${MEDIAPIPE_CDN}/hand_landmarker.task`,
+      modelAssetPath: MODEL_URL,
       delegate: 'GPU'
     },
     runningMode: 'VIDEO',
