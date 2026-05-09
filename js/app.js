@@ -1,16 +1,21 @@
-import { initPdfViewer, loadPdf, nextSlide, prevSlide, zoomIn, zoomOut, resetZoom, renderPage, getState } from './pdf-viewer.js';
-import { initGesture, startWebcam, stopWebcam, getIndexFingerTip } from './gesture.js';
+import { initPdfViewer, loadPdf, nextSlide, prevSlide, goToPage, zoomIn, zoomOut, resetZoom, renderPage, getState, getPdfDoc } from './pdf-viewer.js?v=3';
+import { initGesture, startWebcam, stopWebcam, getIndexFingerTip } from './gesture.js?v=3';
 import {
   initUI,
   drawHandSkeleton,
-  updateGestureBadge,
+  showGestureToast,
   updateSlideCounter,
   showLaserPointer,
   hideLaserPointer,
   setupDragDrop,
   showScreen,
-  showCameraError
-} from './ui.js';
+  showCameraError,
+  showOnboarding,
+  hideOnboarding
+} from './ui.js?v=3';
+import { getAction, isOnboarded, setOnboarded } from './settings.js?v=3';
+import { initAnnotations, resizeAnnotationCanvas, drawAt, stopDrawing, clearAnnotations } from './annotations.js?v=3';
+import { initThumbnails, renderThumbnails, highlightThumb, toggleThumbnails, hideThumbnails } from './thumbnails.js?v=3';
 
 let currentGesture = 'none';
 let gestureHoldTimer = null;
@@ -32,7 +37,7 @@ async function init() {
     if (pdfUrl) {
       await startPresenter();
       await loadPdf(pdfUrl);
-      updateSlideCounter(1, getState().totalPages);
+      afterPdfLoaded();
     }
   } catch (err) {
     console.error('[Deckd] Init error:', err);
@@ -43,9 +48,23 @@ async function onPdfLoaded(arrayBuffer) {
   try {
     await startPresenter();
     await loadPdf(arrayBuffer);
-    updateSlideCounter(1, getState().totalPages);
+    afterPdfLoaded();
   } catch (err) {
     console.error('[Deckd] PDF load error:', err);
+  }
+}
+
+function afterPdfLoaded() {
+  const state = getState();
+  updateSlideCounter(1, state.totalPages);
+
+  const pdfDoc = getPdfDoc();
+  if (pdfDoc) {
+    renderThumbnails(pdfDoc);
+  }
+
+  if (!isOnboarded()) {
+    showOnboarding();
   }
 }
 
@@ -55,10 +74,21 @@ async function startPresenter() {
   const slideCanvas = document.getElementById('slide-canvas');
   await initPdfViewer(slideCanvas, (current, total) => {
     updateSlideCounter(current, total);
+    highlightThumb(current);
   });
 
-  const skeletonCanvas = document.getElementById('skeleton-canvas');
-  initUI(skeletonCanvas);
+  initUI(null); // no skeleton canvas in cinema minimal
+  initAnnotations(document.getElementById('slide-container'));
+  initThumbnails((page) => goToPage(page));
+
+  // Onboarding dismiss
+  const dismissBtn = document.getElementById('onboarding-dismiss');
+  if (dismissBtn) {
+    dismissBtn.addEventListener('click', () => {
+      hideOnboarding();
+      setOnboarded();
+    });
+  }
 
   try {
     const video = document.getElementById('webcam-video');
@@ -78,29 +108,52 @@ function onGesture(gesture, landmarks) {
   if (gesture === currentGesture) return;
 
   clearGestureHold();
+  const prevGesture = currentGesture;
   currentGesture = gesture;
-  updateGestureBadge(gesture);
 
-  switch (gesture) {
-    case 'swipe_right':
+  // Stop annotation drawing when leaving peace gesture
+  if (prevGesture === 'peace' && gesture !== 'peace') {
+    stopDrawing();
+  }
+
+  showGestureToast(gesture);
+
+  const action = getAction(gesture);
+  if (!action) return;
+
+  executeAction(action, landmarks);
+}
+
+function executeAction(action, landmarks) {
+  switch (action) {
+    case 'next':
       nextSlide();
+      clearAnnotations();
       break;
-    case 'swipe_left':
+    case 'prev':
       prevSlide();
+      clearAnnotations();
       break;
-    case 'thumbs_up':
+    case 'zoomIn':
       handleZoomGesture(landmarks, 'in');
       break;
-    case 'thumbs_down':
+    case 'zoomOut':
       handleZoomGesture(landmarks, 'out');
       break;
-    case 'fist':
+    case 'resetZoom':
       resetZoom();
       break;
-    case 'open_palm':
+    case 'laser':
+      // laser handled in onLandmarks
       break;
-    case 'none':
-      hideLaserPointer();
+    case 'annotate':
+      // annotation drawing handled in onLandmarks
+      break;
+    case 'thumbnails':
+      toggleThumbnails();
+      break;
+    case 'fullscreen':
+      toggleFullscreen();
       break;
   }
 }
@@ -131,16 +184,37 @@ function clearGestureHold() {
 }
 
 function onLandmarks(landmarks) {
-  drawHandSkeleton(landmarks);
-
+  // Laser pointer mode
   if (currentGesture === 'open_palm' && landmarks) {
-    const tip = getIndexFingerTip(landmarks);
-    if (tip) {
-      const container = document.getElementById('slide-container');
-      showLaserPointer(tip.x, tip.y, container);
+    const action = getAction('open_palm');
+    if (action === 'laser') {
+      const tip = getIndexFingerTip(landmarks);
+      if (tip) {
+        const container = document.getElementById('slide-container');
+        showLaserPointer(tip.x, tip.y, container);
+      }
     }
   } else if (currentGesture !== 'open_palm') {
     hideLaserPointer();
+  }
+
+  // Annotation mode
+  if (currentGesture === 'peace' && landmarks) {
+    const action = getAction('peace');
+    if (action === 'annotate') {
+      const tip = getIndexFingerTip(landmarks);
+      if (tip) {
+        drawAt(tip.x, tip.y);
+      }
+    }
+  }
+}
+
+function toggleFullscreen() {
+  if (document.fullscreenElement) {
+    document.exitFullscreen();
+  } else {
+    document.documentElement.requestFullscreen().catch(() => {});
   }
 }
 
@@ -149,9 +223,11 @@ function setupKeyboard() {
     switch (e.key) {
       case 'ArrowRight':
         nextSlide();
+        clearAnnotations();
         break;
       case 'ArrowLeft':
         prevSlide();
+        clearAnnotations();
         break;
       case '+':
       case '=':
@@ -160,10 +236,30 @@ function setupKeyboard() {
       case '-':
         zoomOut();
         break;
+      case 'f':
+      case 'F':
+        toggleFullscreen();
+        break;
+      case 't':
+      case 'T':
+        toggleThumbnails();
+        break;
+      case 'c':
+      case 'C':
+        clearAnnotations();
+        break;
+      case '?':
+        showOnboarding();
+        break;
       case 'Escape':
-        stopWebcam();
-        hideLaserPointer();
-        showScreen('landing');
+        if (document.fullscreenElement) {
+          document.exitFullscreen();
+        } else {
+          stopWebcam();
+          hideLaserPointer();
+          hideThumbnails();
+          showScreen('landing');
+        }
         break;
     }
   });
@@ -171,7 +267,10 @@ function setupKeyboard() {
 
 window.addEventListener('resize', () => {
   const state = getState();
-  if (state.totalPages > 0) renderPage();
+  if (state.totalPages > 0) {
+    renderPage();
+    resizeAnnotationCanvas();
+  }
 });
 
 init();

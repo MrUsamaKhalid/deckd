@@ -46,22 +46,25 @@ async function loadPdf(source) {
   notifySlideChange();
 }
 
-async function renderPage() {
+async function renderPage(withTransition = false) {
   if (!pdfDoc || rendering) return;
   rendering = true;
 
   try {
+    if (withTransition) {
+      canvas.style.opacity = '0';
+      await new Promise(r => setTimeout(r, 150));
+    }
+
     const page = await pdfDoc.getPage(currentPage);
     const container = canvas.parentElement;
 
-    // Wait a frame for layout to settle
     await new Promise(r => requestAnimationFrame(r));
 
     const containerWidth = container.clientWidth;
     const containerHeight = container.clientHeight;
 
     if (containerWidth === 0 || containerHeight === 0) {
-      console.warn('Container has zero dimensions, retrying...');
       rendering = false;
       setTimeout(() => renderPage(), 100);
       return;
@@ -84,8 +87,13 @@ async function renderPage() {
 
     const renderTask = page.render({ canvasContext: ctx, viewport });
     await renderTask.promise;
+
+    if (withTransition) {
+      canvas.style.opacity = '1';
+    }
   } catch (err) {
     console.error('Render error:', err);
+    canvas.style.opacity = '1';
   } finally {
     rendering = false;
   }
@@ -104,7 +112,7 @@ function nextSlide() {
   if (!pdfDoc || currentPage >= totalPages) return;
   currentPage++;
   zoomLevel = 1.0;
-  renderPage();
+  renderPage(true);
   notifySlideChange();
 }
 
@@ -112,7 +120,15 @@ function prevSlide() {
   if (!pdfDoc || currentPage <= 1) return;
   currentPage--;
   zoomLevel = 1.0;
-  renderPage();
+  renderPage(true);
+  notifySlideChange();
+}
+
+function goToPage(pageNum) {
+  if (!pdfDoc || pageNum < 1 || pageNum > totalPages || pageNum === currentPage) return;
+  currentPage = pageNum;
+  zoomLevel = 1.0;
+  renderPage(true);
   notifySlideChange();
 }
 
@@ -144,14 +160,20 @@ function getState() {
   return { currentPage, totalPages, zoomLevel };
 }
 
+function getPdfDoc() {
+  return pdfDoc;
+}
+
 export {
   initPdfViewer,
   loadPdf,
   renderPage,
   nextSlide,
   prevSlide,
+  goToPage,
   zoomIn,
   zoomOut,
   resetZoom,
-  getState
+  getState,
+  getPdfDoc
 };
