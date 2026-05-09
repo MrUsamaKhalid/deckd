@@ -59,6 +59,22 @@ function updateGestureBadge(gesture) {
   document.getElementById('gesture-text').textContent = display.text;
 }
 
+function showCameraError(type) {
+  const badge = document.getElementById('gesture-badge');
+  const icon = document.getElementById('gesture-icon');
+  const text = document.getElementById('gesture-text');
+
+  if (type === 'denied') {
+    icon.textContent = '🚫';
+    text.textContent = 'Camera blocked — click 🔒 in address bar to allow';
+    badge.classList.add('camera-error');
+  } else {
+    icon.textContent = '⚠️';
+    text.textContent = 'Camera unavailable — using keyboard only';
+    badge.classList.add('camera-error');
+  }
+}
+
 function updateSlideCounter(current, total) {
   document.getElementById('current-slide').textContent = current;
   document.getElementById('total-slides').textContent = total;
@@ -123,5 +139,6 @@ export {
   showLaserPointer,
   hideLaserPointer,
   setupDragDrop,
-  showScreen
+  showScreen,
+  showCameraError
 };
