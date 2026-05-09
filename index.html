@@ -10,10 +10,10 @@
   <!-- Landing Page -->
   <div id="landing" class="screen active">
     <div class="landing-container">
-      <h1 class="logo">Deckd</h1>
-      <p class="tagline">Control presentations with your hands</p>
+      <h1 class="logo fade-in">Deckd</h1>
+      <p class="tagline fade-in delay-1">Control presentations with your hands</p>
 
-      <div id="drop-zone" class="drop-zone">
+      <div id="drop-zone" class="drop-zone fade-in delay-2">
         <div class="drop-zone-content">
           <span class="drop-icon">📄</span>
           <p class="drop-text">Drop your PDF here</p>
@@ -22,7 +22,7 @@
         <input type="file" id="file-input" accept=".pdf" hidden>
       </div>
 
-      <div class="features">
+      <div class="features fade-in delay-3">
         <span class="feature">✋ Gesture control</span>
         <span class="feature-dot">·</span>
         <span class="feature">🔒 100% local</span>
@@ -39,21 +39,68 @@
       <div id="laser-pointer" class="laser-pointer" hidden></div>
     </div>
 
-    <div id="webcam-strip" class="webcam-strip">
-      <div class="webcam-wrapper">
-        <video id="webcam-video" autoplay playsinline muted></video>
-        <canvas id="skeleton-canvas"></canvas>
-      </div>
-      <div id="gesture-badge" class="gesture-badge">
-        <span id="gesture-icon">🤚</span>
-        <span id="gesture-text">Waiting...</span>
-      </div>
-      <div id="slide-counter" class="slide-counter">
-        <span id="current-slide">0</span> / <span id="total-slides">0</span>
+    <!-- Cinema Minimal: Floating gesture toast -->
+    <div id="gesture-toast" class="gesture-toast">
+      <span class="toast-icon">🤚</span>
+      <span class="toast-text">Waiting...</span>
+    </div>
+
+    <!-- Cinema Minimal: Floating slide counter -->
+    <div id="slide-counter" class="slide-counter">
+      <span id="current-slide">0</span> / <span id="total-slides">0</span>
+    </div>
+
+    <!-- Cinema Minimal: Webcam PiP -->
+    <div class="webcam-pip">
+      <video id="webcam-video" autoplay playsinline muted></video>
+    </div>
+
+    <!-- Hidden skeleton canvas for gesture processing -->
+    <canvas id="skeleton-canvas" style="display:none;"></canvas>
+
+    <!-- Thumbnail strip -->
+    <div id="thumbnail-strip" class="thumbnail-strip"></div>
+
+    <!-- Onboarding overlay -->
+    <div id="onboarding-overlay" class="onboarding-overlay">
+      <div class="onboarding-card">
+        <h2>Gesture Controls</h2>
+        <div class="onboarding-grid">
+          <div class="onboarding-item">
+            <span class="onboarding-emoji">👉</span>
+            <span>Swipe Right — Next</span>
+          </div>
+          <div class="onboarding-item">
+            <span class="onboarding-emoji">👈</span>
+            <span>Swipe Left — Previous</span>
+          </div>
+          <div class="onboarding-item">
+            <span class="onboarding-emoji">👍</span>
+            <span>Thumbs Up — Zoom In</span>
+          </div>
+          <div class="onboarding-item">
+            <span class="onboarding-emoji">👎</span>
+            <span>Thumbs Down — Zoom Out</span>
+          </div>
+          <div class="onboarding-item">
+            <span class="onboarding-emoji">🖐</span>
+            <span>Open Palm — Laser Pointer</span>
+          </div>
+          <div class="onboarding-item">
+            <span class="onboarding-emoji">✊</span>
+            <span>Fist — Reset Zoom</span>
+          </div>
+          <div class="onboarding-item">
+            <span class="onboarding-emoji">✌️</span>
+            <span>Peace Sign — Annotate</span>
+          </div>
+        </div>
+        <p class="onboarding-keys">Keyboard: Arrows, +/-, T (thumbnails), F (fullscreen), C (clear), Esc</p>
+        <button id="onboarding-dismiss" class="onboarding-btn">Got it</button>
       </div>
     </div>
   </div>
 
-  <script type="module" src="js/app.js"></script>
+  <script type="module" src="js/app.js?v=3"></script>
 </body>
 </html>

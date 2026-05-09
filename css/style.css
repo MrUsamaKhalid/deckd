@@ -8,7 +8,7 @@
 html, body {
   height: 100%;
   font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-  background: #fafafa;
+  background: #0a0a0a;
   color: #111;
   overflow: hidden;
 }
@@ -38,7 +38,7 @@ html, body {
 }
 
 .logo {
-  font-size: 48px;
+  font-size: 52px;
   font-weight: 700;
   letter-spacing: -2px;
   color: #111;
@@ -60,7 +60,7 @@ html, body {
   align-items: center;
   justify-content: center;
   cursor: pointer;
-  transition: border-color 0.2s, background 0.2s;
+  transition: border-color 0.2s, background 0.2s, transform 0.2s;
   background: #fff;
 }
 
@@ -68,6 +68,7 @@ html, body {
 .drop-zone.drag-over {
   border-color: #111;
   background: #f5f5f5;
+  transform: scale(1.02);
 }
 
 .drop-zone-content {
@@ -105,10 +106,29 @@ html, body {
   color: #ccc;
 }
 
-/* === Presenter View === */
+/* === Landing Animations === */
+.fade-in {
+  opacity: 0;
+  transform: translateY(12px);
+  animation: fadeInUp 0.5s ease forwards;
+}
+
+.delay-1 { animation-delay: 0.1s; }
+.delay-2 { animation-delay: 0.2s; }
+.delay-3 { animation-delay: 0.35s; }
+
+@keyframes fadeInUp {
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* === Presenter View — Cinema Minimal === */
 #presenter {
   flex-direction: column;
   background: #000;
+  position: relative;
 }
 
 .slide-container {
@@ -118,107 +138,265 @@ html, body {
   align-items: center;
   justify-content: center;
   overflow: hidden;
-  background: #111;
+  background: #000;
 }
 
 #slide-canvas {
   max-width: 100%;
   max-height: 100%;
   object-fit: contain;
-  transition: transform 0.15s ease-out;
+  transition: transform 0.15s ease-out, opacity 0.15s ease;
 }
 
+/* === Laser Pointer with Trail === */
 .laser-pointer {
   position: absolute;
-  width: 12px;
-  height: 12px;
+  width: 14px;
+  height: 14px;
   background: #ff3b30;
   border-radius: 50%;
-  box-shadow: 0 0 8px 3px rgba(255, 59, 48, 0.5);
+  box-shadow:
+    0 0 8px 3px rgba(255, 59, 48, 0.5),
+    0 0 20px 6px rgba(255, 59, 48, 0.2);
   pointer-events: none;
   transform: translate(-50%, -50%);
   z-index: 10;
+  transition: left 0.05s linear, top 0.05s linear;
 }
 
-/* === Webcam Strip === */
-.webcam-strip {
-  height: 80px;
-  background: #0a0a0a;
+/* === Gesture Toast — Cinema Minimal === */
+.gesture-toast {
+  position: absolute;
+  bottom: 60px;
+  left: 50%;
+  transform: translateX(-50%) translateY(20px);
+  background: rgba(255, 255, 255, 0.1);
+  backdrop-filter: blur(24px);
+  -webkit-backdrop-filter: blur(24px);
+  padding: 8px 24px;
+  border-radius: 24px;
   display: flex;
   align-items: center;
-  border-top: 1px solid #222;
-  padding: 0 12px;
-  gap: 12px;
+  gap: 8px;
+  font-size: 14px;
+  color: #fff;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.15s ease, transform 0.15s ease;
+  z-index: 20;
+  border: 1px solid rgba(255, 255, 255, 0.08);
 }
 
-.webcam-wrapper {
-  position: relative;
+.gesture-toast.visible {
+  opacity: 1;
+  transform: translateX(-50%) translateY(0);
+}
+
+.gesture-toast.error {
+  background: rgba(255, 59, 48, 0.15);
+  border-color: rgba(255, 59, 48, 0.2);
+  opacity: 1;
+  transform: translateX(-50%) translateY(0);
+}
+
+.toast-icon {
+  font-size: 18px;
+}
+
+/* === Slide Counter — Cinema Minimal === */
+.slide-counter {
+  position: absolute;
+  bottom: 16px;
+  right: 20px;
+  font-size: 13px;
+  color: #fff;
+  opacity: 0.2;
+  font-variant-numeric: tabular-nums;
+  transition: opacity 0.4s ease;
+  z-index: 15;
+  pointer-events: none;
+}
+
+.slide-counter.visible {
+  opacity: 0.7;
+}
+
+/* === Webcam PiP — Cinema Minimal === */
+.webcam-pip {
+  position: absolute;
+  bottom: 14px;
+  left: 14px;
+  width: 64px;
   height: 64px;
-  aspect-ratio: 4/3;
-  border-radius: 8px;
+  border-radius: 50%;
   overflow: hidden;
-  flex-shrink: 0;
+  border: 2px solid rgba(255, 255, 255, 0.12);
+  z-index: 15;
+  opacity: 0.8;
+  transition: opacity 0.2s, transform 0.2s;
 }
 
-#webcam-video {
+.webcam-pip:hover {
+  opacity: 1;
+  transform: scale(1.1);
+}
+
+.webcam-pip video {
   width: 100%;
   height: 100%;
   object-fit: cover;
   transform: scaleX(-1);
 }
 
-#skeleton-canvas {
+/* === Thumbnail Strip === */
+.thumbnail-strip {
   position: absolute;
-  top: 0;
+  bottom: 0;
   left: 0;
-  width: 100%;
-  height: 100%;
-  transform: scaleX(-1);
-}
-
-.gesture-badge {
+  right: 0;
+  height: 90px;
+  background: rgba(0, 0, 0, 0.85);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
   display: flex;
   align-items: center;
-  gap: 6px;
-  background: rgba(255, 255, 255, 0.08);
-  padding: 6px 14px;
-  border-radius: 20px;
-  font-size: 13px;
-  color: #aaa;
-  white-space: nowrap;
+  gap: 8px;
+  padding: 8px 16px;
+  overflow-x: auto;
+  z-index: 25;
+  transform: translateY(100%);
+  transition: transform 0.25s ease;
+  border-top: 1px solid rgba(255, 255, 255, 0.06);
 }
 
-#gesture-icon {
-  font-size: 16px;
+.thumbnail-strip.visible {
+  transform: translateY(0);
 }
 
-.slide-counter {
-  margin-left: auto;
-  font-size: 14px;
-  color: #666;
-  font-variant-numeric: tabular-nums;
-  padding-right: 8px;
-  white-space: nowrap;
+.thumbnail-strip::-webkit-scrollbar {
+  height: 4px;
 }
 
-/* === Camera Error === */
-.gesture-badge.camera-error {
-  background: rgba(255, 59, 48, 0.12);
-  color: #ff6b6b;
-  animation: pulse-error 2s ease-in-out 3;
+.thumbnail-strip::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.15);
+  border-radius: 2px;
 }
 
-@keyframes pulse-error {
-  0%, 100% { opacity: 1; }
-  50% { opacity: 0.6; }
+.thumb-item {
+  flex-shrink: 0;
+  cursor: pointer;
+  position: relative;
+  border-radius: 4px;
+  overflow: hidden;
+  border: 2px solid transparent;
+  transition: border-color 0.15s, transform 0.15s;
+  opacity: 0.6;
 }
 
-/* === Loading State === */
-.loading-text {
-  color: #666;
-  font-size: 14px;
+.thumb-item:hover {
+  opacity: 0.9;
+  transform: scale(1.05);
+}
+
+.thumb-item.active {
+  border-color: #fff;
+  opacity: 1;
+}
+
+.thumb-item canvas {
+  display: block;
+}
+
+.thumb-label {
   position: absolute;
-  top: 50%;
-  left: 50%;
-  transform: translate(-50%, -50%);
+  bottom: 2px;
+  right: 4px;
+  font-size: 9px;
+  color: rgba(255, 255, 255, 0.6);
+  font-weight: 600;
+}
+
+/* === Onboarding Overlay === */
+.onboarding-overlay {
+  position: absolute;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.8);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 50;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.3s ease;
+}
+
+.onboarding-overlay.visible {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+.onboarding-card {
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 20px;
+  padding: 36px 40px;
+  max-width: 480px;
+  width: 90%;
+  text-align: center;
+}
+
+.onboarding-card h2 {
+  color: #fff;
+  font-size: 22px;
+  font-weight: 600;
+  margin-bottom: 24px;
+}
+
+.onboarding-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+  text-align: left;
+  margin-bottom: 20px;
+}
+
+.onboarding-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  color: rgba(255, 255, 255, 0.8);
+  font-size: 13px;
+  padding: 6px 0;
+}
+
+.onboarding-emoji {
+  font-size: 20px;
+  width: 28px;
+  text-align: center;
+  flex-shrink: 0;
+}
+
+.onboarding-keys {
+  color: rgba(255, 255, 255, 0.35);
+  font-size: 11px;
+  margin-bottom: 20px;
+}
+
+.onboarding-btn {
+  background: #fff;
+  color: #000;
+  border: none;
+  padding: 10px 32px;
+  border-radius: 10px;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: transform 0.15s, opacity 0.15s;
+}
+
+.onboarding-btn:hover {
+  transform: scale(1.05);
+  opacity: 0.9;
 }

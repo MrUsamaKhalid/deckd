@@ -1,5 +1,18 @@
 let skeletonCanvas = null;
 let skeletonCtx = null;
+let toastTimer = null;
+let counterFadeTimer = null;
+
+const GESTURE_DISPLAY = {
+  'none':        { icon: '🤚', text: 'Waiting...' },
+  'swipe_left':  { icon: '👈', text: 'Previous' },
+  'swipe_right': { icon: '👉', text: 'Next' },
+  'thumbs_up':   { icon: '👍', text: 'Zoom In' },
+  'thumbs_down': { icon: '👎', text: 'Zoom Out' },
+  'open_palm':   { icon: '🖐', text: 'Pointer' },
+  'fist':        { icon: '✊', text: 'Reset Zoom' },
+  'peace':       { icon: '✌️', text: 'Annotate' }
+};
 
 const HAND_CONNECTIONS = [
   [0,1],[1,2],[2,3],[3,4],
@@ -10,19 +23,11 @@ const HAND_CONNECTIONS = [
   [5,9],[9,13],[13,17]
 ];
 
-const GESTURE_DISPLAY = {
-  'none':        { icon: '🤚', text: 'Waiting...' },
-  'swipe_left':  { icon: '👈', text: 'Previous' },
-  'swipe_right': { icon: '👉', text: 'Next' },
-  'thumbs_up':   { icon: '👍', text: 'Zoom In' },
-  'thumbs_down': { icon: '👎', text: 'Zoom Out' },
-  'open_palm':   { icon: '🖐', text: 'Pointer' },
-  'fist':        { icon: '✊', text: 'Reset Zoom' }
-};
-
 function initUI(skeletonCanvasEl) {
   skeletonCanvas = skeletonCanvasEl;
-  skeletonCtx = skeletonCanvas.getContext('2d');
+  if (skeletonCanvas) {
+    skeletonCtx = skeletonCanvas.getContext('2d');
+  }
 }
 
 function drawHandSkeleton(landmarks) {
@@ -53,31 +58,40 @@ function drawHandSkeleton(landmarks) {
   }
 }
 
-function updateGestureBadge(gesture) {
+function showGestureToast(gesture) {
   const display = GESTURE_DISPLAY[gesture] || GESTURE_DISPLAY['none'];
-  document.getElementById('gesture-icon').textContent = display.icon;
-  document.getElementById('gesture-text').textContent = display.text;
-}
+  if (gesture === 'none' || gesture === 'open_palm') return;
 
-function showCameraError(type) {
-  const badge = document.getElementById('gesture-badge');
-  const icon = document.getElementById('gesture-icon');
-  const text = document.getElementById('gesture-text');
+  const toast = document.getElementById('gesture-toast');
+  if (!toast) return;
 
-  if (type === 'denied') {
-    icon.textContent = '🚫';
-    text.textContent = 'Camera blocked — click 🔒 in address bar to allow';
-    badge.classList.add('camera-error');
-  } else {
-    icon.textContent = '⚠️';
-    text.textContent = 'Camera unavailable — using keyboard only';
-    badge.classList.add('camera-error');
-  }
+  toast.querySelector('.toast-icon').textContent = display.icon;
+  toast.querySelector('.toast-text').textContent = display.text;
+  toast.classList.remove('visible');
+
+  // Force reflow to restart animation
+  void toast.offsetWidth;
+  toast.classList.add('visible');
+
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => {
+    toast.classList.remove('visible');
+  }, 1200);
 }
 
 function updateSlideCounter(current, total) {
+  const counter = document.getElementById('slide-counter');
+  if (!counter) return;
+
   document.getElementById('current-slide').textContent = current;
   document.getElementById('total-slides').textContent = total;
+
+  // Flash visible then fade
+  counter.classList.add('visible');
+  clearTimeout(counterFadeTimer);
+  counterFadeTimer = setTimeout(() => {
+    counter.classList.remove('visible');
+  }, 2000);
 }
 
 function showLaserPointer(x, y, slideContainer) {
@@ -90,7 +104,25 @@ function showLaserPointer(x, y, slideContainer) {
 }
 
 function hideLaserPointer() {
-  document.getElementById('laser-pointer').hidden = true;
+  const pointer = document.getElementById('laser-pointer');
+  if (pointer) pointer.hidden = true;
+}
+
+function showCameraError(type) {
+  const toast = document.getElementById('gesture-toast');
+  if (!toast) return;
+
+  const icon = toast.querySelector('.toast-icon');
+  const text = toast.querySelector('.toast-text');
+
+  if (type === 'denied') {
+    icon.textContent = '🚫';
+    text.textContent = 'Camera blocked — click lock icon to allow';
+  } else {
+    icon.textContent = '⚠️';
+    text.textContent = 'Camera unavailable — keyboard only';
+  }
+  toast.classList.add('visible', 'error');
 }
 
 function setupDragDrop(dropZone, fileInput, onFileLoad) {
@@ -131,14 +163,26 @@ function showScreen(screenId) {
   document.getElementById(screenId).classList.add('active');
 }
 
+function showOnboarding() {
+  const overlay = document.getElementById('onboarding-overlay');
+  if (overlay) overlay.classList.add('visible');
+}
+
+function hideOnboarding() {
+  const overlay = document.getElementById('onboarding-overlay');
+  if (overlay) overlay.classList.remove('visible');
+}
+
 export {
   initUI,
   drawHandSkeleton,
-  updateGestureBadge,
+  showGestureToast,
   updateSlideCounter,
   showLaserPointer,
   hideLaserPointer,
   setupDragDrop,
   showScreen,
-  showCameraError
+  showCameraError,
+  showOnboarding,
+  hideOnboarding
 };

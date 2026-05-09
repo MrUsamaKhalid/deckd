@@ -8,13 +8,27 @@ let gestureCallback = null;
 let landmarkCallback = null;
 let running = false;
 
+// Swipe detection
 const SWIPE_THRESHOLD = 0.15;
+const MIN_VELOCITY = 0.0005;
 const SWIPE_TIME_WINDOW = 300;
-const COOLDOWN_MS = 500;
+
+// Hysteresis state machine
+const CONFIRM_FRAMES = 6;
+let candidateGesture = null;
+let candidateFrames = 0;
+let confirmedGesture = 'none';
+
+// Per-type cooldowns
+const COOLDOWN_SWIPE = 600;
+const COOLDOWN_STATIC = 300;
+let lastSwipeTime = 0;
+let lastStaticTime = 0;
+
+// Finger margin for confidence
+const FINGER_MARGIN = 0.04;
 
 let wristHistory = [];
-let lastGestureTime = 0;
-let lastGesture = 'none';
 
 async function initGesture(videoEl, onGesture, onLandmarks) {
   videoElement = videoEl;
@@ -70,7 +84,7 @@ function detectLoop() {
     processGestures(landmarks, now);
   } else {
     if (landmarkCallback) landmarkCallback(null);
-    emitGesture('none', null, now);
+    updateStateMachine('none', null, now);
   }
 
   requestAnimationFrame(detectLoop);
@@ -82,52 +96,69 @@ function processGestures(landmarks, now) {
   wristHistory.push({ x: wrist.x, time: now });
   wristHistory = wristHistory.filter(p => now - p.time < SWIPE_TIME_WINDOW);
 
-  if (now - lastGestureTime < COOLDOWN_MS) {
-    const staticGesture = classifyStaticGesture(landmarks);
-    emitGesture(staticGesture, landmarks, now);
-    return;
-  }
-
-  if (wristHistory.length >= 2) {
+  // Check swipes first (instant, no hysteresis)
+  if (now - lastSwipeTime >= COOLDOWN_SWIPE && wristHistory.length >= 2) {
     const first = wristHistory[0];
     const last = wristHistory[wristHistory.length - 1];
     const deltaX = last.x - first.x;
+    const deltaTime = last.time - first.time;
 
-    if (Math.abs(deltaX) > SWIPE_THRESHOLD) {
-      const gesture = deltaX > 0 ? 'swipe_right' : 'swipe_left';
-      emitGesture(gesture, landmarks, now);
-      lastGestureTime = now;
-      wristHistory = [];
-      return;
+    if (deltaTime > 0 && Math.abs(deltaX) > SWIPE_THRESHOLD) {
+      const velocity = Math.abs(deltaX) / deltaTime;
+      if (velocity > MIN_VELOCITY) {
+        const gesture = deltaX > 0 ? 'swipe_right' : 'swipe_left';
+        emitGesture(gesture, landmarks);
+        lastSwipeTime = now;
+        wristHistory = [];
+        return;
+      }
     }
   }
 
-  const staticGesture = classifyStaticGesture(landmarks);
-  emitGesture(staticGesture, landmarks, now);
+  // Static gestures go through hysteresis
+  const raw = classifyStaticGesture(landmarks);
+  updateStateMachine(raw, landmarks, now);
+}
 
-  if (staticGesture === 'thumbs_up' || staticGesture === 'thumbs_down' || staticGesture === 'fist') {
-    if (lastGesture !== staticGesture) {
-      lastGestureTime = now;
+function updateStateMachine(raw, landmarks, now) {
+  if (raw === candidateGesture) {
+    candidateFrames++;
+  } else {
+    candidateGesture = raw;
+    candidateFrames = 1;
+  }
+
+  if (candidateFrames >= CONFIRM_FRAMES && candidateGesture !== confirmedGesture) {
+    if (candidateGesture === 'none' || now - lastStaticTime >= COOLDOWN_STATIC) {
+      confirmedGesture = candidateGesture;
+      if (candidateGesture !== 'none') lastStaticTime = now;
+      emitGesture(confirmedGesture, landmarks);
     }
   }
 }
 
 function classifyStaticGesture(landmarks) {
-  const dominated = isRightHand(landmarks);
-  const fingers = getFingerStates(landmarks, dominated);
+  const isRight = isRightHand(landmarks);
+  const fingers = getFingerStates(landmarks, isRight);
 
-  const thumbUp = fingers.thumb && !fingers.index && !fingers.middle && !fingers.ring && !fingers.pinky;
-  if (thumbUp) {
-    const thumbTip = landmarks[4];
-    const thumbBase = landmarks[2];
-    if (thumbTip.y < thumbBase.y) return 'thumbs_up';
-    else return 'thumbs_down';
+  // Peace sign: index + middle up, rest down
+  if (!fingers.thumb && fingers.index && fingers.middle && !fingers.ring && !fingers.pinky) {
+    return 'peace';
   }
 
+  // Thumbs up/down: only thumb extended
+  if (fingers.thumb && !fingers.index && !fingers.middle && !fingers.ring && !fingers.pinky) {
+    const thumbTip = landmarks[4];
+    const thumbBase = landmarks[2];
+    return thumbTip.y < thumbBase.y ? 'thumbs_up' : 'thumbs_down';
+  }
+
+  // Open palm: all extended
   if (fingers.thumb && fingers.index && fingers.middle && fingers.ring && fingers.pinky) {
     return 'open_palm';
   }
 
+  // Fist: none extended
   if (!fingers.thumb && !fingers.index && !fingers.middle && !fingers.ring && !fingers.pinky) {
     return 'fist';
   }
@@ -142,18 +173,19 @@ function isRightHand(landmarks) {
 function getFingerStates(landmarks, isRight) {
   const thumbTip = landmarks[4];
   const thumbIP = landmarks[3];
-  const thumb = isRight ? (thumbTip.x < thumbIP.x) : (thumbTip.x > thumbIP.x);
+  const thumb = isRight
+    ? (thumbTip.x < thumbIP.x - FINGER_MARGIN)
+    : (thumbTip.x > thumbIP.x + FINGER_MARGIN);
 
-  const index = landmarks[8].y < landmarks[6].y;
-  const middle = landmarks[12].y < landmarks[10].y;
-  const ring = landmarks[16].y < landmarks[14].y;
-  const pinky = landmarks[20].y < landmarks[18].y;
+  const index = landmarks[8].y < landmarks[6].y - FINGER_MARGIN;
+  const middle = landmarks[12].y < landmarks[10].y - FINGER_MARGIN;
+  const ring = landmarks[16].y < landmarks[14].y - FINGER_MARGIN;
+  const pinky = landmarks[20].y < landmarks[18].y - FINGER_MARGIN;
 
   return { thumb, index, middle, ring, pinky };
 }
 
-function emitGesture(gesture, landmarks, now) {
-  lastGesture = gesture;
+function emitGesture(gesture, landmarks) {
   if (gestureCallback) {
     gestureCallback(gesture, landmarks);
   }
