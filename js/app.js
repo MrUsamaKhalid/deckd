@@ -8,7 +8,8 @@ import {
   showLaserPointer,
   hideLaserPointer,
   setupDragDrop,
-  showScreen
+  showScreen,
+  showCameraError
 } from './ui.js';
 
 let currentGesture = 'none';
@@ -64,8 +65,12 @@ async function startPresenter() {
     await initGesture(video, onGesture, onLandmarks);
     await startWebcam();
   } catch (err) {
-    console.warn('[Deckd] Gesture init failed, using keyboard controls only:', err);
-    updateGestureBadge('none');
+    console.warn('[Deckd] Gesture init failed:', err);
+    if (err.name === 'NotAllowedError') {
+      showCameraError('denied');
+    } else {
+      showCameraError('unavailable');
+    }
   }
 }
 

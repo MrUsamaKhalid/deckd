@@ -201,6 +201,18 @@ html, body {
   white-space: nowrap;
 }
 
+/* === Camera Error === */
+.gesture-badge.camera-error {
+  background: rgba(255, 59, 48, 0.12);
+  color: #ff6b6b;
+  animation: pulse-error 2s ease-in-out 3;
+}
+
+@keyframes pulse-error {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.6; }
+}
+
 /* === Loading State === */
 .loading-text {
   color: #666;
