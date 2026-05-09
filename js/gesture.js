@@ -106,7 +106,8 @@ function processGestures(landmarks, now) {
     if (deltaTime > 0 && Math.abs(deltaX) > SWIPE_THRESHOLD) {
       const velocity = Math.abs(deltaX) / deltaTime;
       if (velocity > MIN_VELOCITY) {
-        const gesture = deltaX > 0 ? 'swipe_right' : 'swipe_left';
+        // Webcam is mirrored — negate so user's right = swipe_right
+        const gesture = deltaX > 0 ? 'swipe_left' : 'swipe_right';
         emitGesture(gesture, landmarks);
         lastSwipeTime = now;
         wristHistory = [];
